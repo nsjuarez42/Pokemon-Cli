@@ -1,15 +1,14 @@
 package cmd
 
-//TODO: Beautify output with pterm 
+//TODO: 
 //extend usage with API
 import (
 	"github.com/spf13/cobra"
-	//"github.com/pterm/pterm"
+	"github.com/pterm/pterm"
 	"net/http"
 	"log"
 	"encoding/json"
 	"io/ioutil"
-	"strings"
 	"strconv"
 )
 
@@ -54,13 +53,11 @@ func RootCommand() *cobra.Command {
 		Long:  "A basic CLI example using Cobra",
 		Run: func(cmd *cobra.Command, args []string) {
 			
-			cmd.Println("Flypoke pokemon get " + args[0])
-
 			resp,err := http.Get("https://pokeapi.co/api/v2/pokemon/" + args[0])
 			if err != nil{
 				log.Fatal(err)
 			}
-			cmd.Println(resp)
+
 			body,readerr := ioutil.ReadAll(resp.Body)
 			if readerr != nil {
 				log.Fatal(err)
@@ -69,18 +66,32 @@ func RootCommand() *cobra.Command {
 			var pokemon Pokemon
 			jsonerr := json.Unmarshal(body,&pokemon)
 			if jsonerr != nil{
-				cmd.Println(jsonerr)
 				log.Fatal(jsonerr)
 			}
-
-			cmd.Println("Name from pokemon is: " + pokemon.Name)
-			cmd.Println("Abilities")
+			var pokeAbilities string = ""
 			for i:= 0; i<len(pokemon.Abilities);i++{
-				cmd.Println(pokemon.Abilities[i].Ability.Name)
+				if i<len(pokemon.Abilities)-1{
+					pokeAbilities+=pokemon.Abilities[i].Ability.Name+","
+				}else{
+					pokeAbilities+=pokemon.Abilities[i].Ability.Name
+				}
 			}
+			var pokeTypes string = ""
 			for i:=0;i<len(pokemon.Types);i++{
-				cmd.Println(pokemon.Types[i].Type.Name)
+				if i<len(pokemon.Types)-1{
+					pokeTypes += pokemon.Types[i].Type.Name + ","
+				}else{
+					pokeTypes+= pokemon.Types[i].Type.Name
+				}
 			}
+
+			
+			tableData := pterm.TableData{
+				{"Name","Types","Abilities"},
+				{pokemon.Name,pokeTypes,pokeAbilities},
+
+			}
+			pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData).Render()
 
 			},
 	}
@@ -96,9 +107,10 @@ func RootCommand() *cobra.Command {
 			grassPokemons := []string{"bulbasaur","ivysaur","venusaur"}
 
 			allPokemons := [][]string{firePokemons,waterPokemons,grassPokemons}
-
-			cmd.Println(strings.Join(columns,","))
+			Data := [11][]string{} 
+			Data[0] = columns
 			sumpoints := [6]int{}
+			datacount := 1
 			for j:=0;j<len(allPokemons);j++{
 				for p:=0;p<len(allPokemons[j]);p++{
 					resp,err := http.Get("https://pokeapi.co/api/v2/pokemon/" + allPokemons[j][p])
@@ -115,28 +127,40 @@ func RootCommand() *cobra.Command {
 					if jsonerr != nil{
 						log.Fatal(jsonerr)
 					}
-					points := [6]string{}
+					Data[datacount] = append(Data[datacount][:],pokemon.Name,pokemon.Types[0].Type.Name)
+					
 					for i:=0;i<len(pokemon.Stats);i++{
-						points[i] = strconv.Itoa(pokemon.Stats[i].Amount)
+						Data[datacount] = append(Data[datacount][:],strconv.Itoa(pokemon.Stats[i].Amount))
 						sumpoints[i] += pokemon.Stats[i].Amount
 					}
-					pokeNameType := []string{pokemon.Name,pokemon.Types[0].Type.Name}
-					
-					if p == len(allPokemons[j])-1 {
-						cmd.Println(strings.Join(pokeNameType,","),",",strings.Join(points[:],","),",","None")
-					} else {
-						cmd.Println(strings.Join(pokeNameType,","),",",strings.Join(points[:],","),",",allPokemons[j][p+1])
-					}
 
+					if p == len(allPokemons[j])-1 {
+						Data[datacount] = append(Data[datacount][:],"None")
+					} else {
+						Data[datacount] = append(Data[datacount][:],allPokemons[j][p+1])
+					}
+					datacount++
 				}
-				
-				
 			}
-			sumpointsStr := [6]string{}
+			Data[datacount] = append(Data[datacount][:],"Aggregated","None")
 			for i:=0;i<len(sumpoints);i++{
-				sumpointsStr[i] = strconv.Itoa(sumpoints[i])
+				Data[datacount] =append(Data[datacount][:],strconv.Itoa(sumpoints[i]))
 			}
-			cmd.Println("Aggregated,None,",strings.Join(sumpointsStr[:],","),",None")
+			Data[datacount] = append(Data[datacount][:],"None")
+			tableData := pterm.TableData{
+				Data[0],
+				Data[1],
+				Data[2],
+				Data[3],
+				Data[4],
+				Data[5],
+				Data[6],
+				Data[7],
+				Data[8],
+				Data[9],
+				Data[10],
+			}
+			pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData).Render()
 		},
 	}
 
@@ -152,8 +176,10 @@ func RootCommand() *cobra.Command {
 			allPokemons := [][]string{firePokemons,waterPokemons,grassPokemons}
 
 			for i:=0;i<len(allPokemons);i++{
-				cmd.Println(allPokemons[i][0] + " Pokemons")
-				cmd.Println("----------")
+			
+				data := [4][2]string{}
+				data[0] = [2]string{allPokemons[i][0] + " Pokemons","Attack"}
+				
 				for p:=1;p<len(allPokemons[i]);p++{
 					resp,err := http.Get("https://pokeapi.co/api/v2/pokemon/"+allPokemons[i][p])
 					if err!= nil{
@@ -170,20 +196,17 @@ func RootCommand() *cobra.Command {
 						log.Fatal(jsonerr)
 					}
 					pokeAttack := pokemon.Stats[1].Amount
-					cmd.Println(pokemon.Name,pokeAttack)
-
+					data[p] = [2]string{pokemon.Name,strconv.Itoa(pokeAttack)}
 				}
+				tableData := pterm.TableData{
+					data[0][:],data[1][:],data[2][:],data[3][:],
+				}
+				pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData).Render()
 			}
-
-
-
-
 
 		},
 	}
-	// Register your commands here
-	//how to add rootcommand
-	//cmd.AddCommand(cmd)
+
 	cmd.AddCommand(pokemon)
 	cmd.AddCommand(attack)
 	cmd.AddCommand(stats)
